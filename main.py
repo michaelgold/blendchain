@@ -23,16 +23,27 @@ app.mount("/static", StaticFiles(directory=rendered_images_dir), name="static")
 
 
 # Pydantic models
+class Vector3D(BaseModel):
+    x: float
+    y: float
+    z: float
+
+
 class BlenderObject(BaseModel):
     name: str
     type: str
-    location: Tuple[float, float, float]
-    rotation: Tuple[float, float, float]
-    scale: Tuple[float, float, float]
+    location: Vector3D
+    rotation: Vector3D
+    scale: Vector3D
 
 
 class SceneGraph(BaseModel):
     objects: List[BlenderObject]
+
+
+class OperationResult(BaseModel):
+    message: str
+    scene_graph: SceneGraph
 
 
 class RenderedScene(BaseModel):
@@ -40,24 +51,29 @@ class RenderedScene(BaseModel):
     scene_graph: SceneGraph
 
 
-# Function to get the scene graph
+class TransformObjectInput(BaseModel):
+    location: Vector3D = None
+    rotation: Vector3D = None
+    scale: Vector3D = None
+
+
 def get_scene_graph() -> SceneGraph:
     objects = []
     for obj in bpy.data.objects:
-        # Convert the rotation to Euler angles if it's not already
         rotation_euler = (
             obj.rotation_euler
             if obj.rotation_mode == "XYZ"
             else obj.rotation_quaternion.to_euler("XYZ")
         )
 
-        # Create a BlenderObject instance
         blender_object = BlenderObject(
             name=obj.name,
             type=obj.type,
-            location=tuple(obj.location),
-            rotation=tuple(rotation_euler),
-            scale=tuple(obj.scale),
+            location=Vector3D(x=obj.location.x, y=obj.location.y, z=obj.location.z),
+            rotation=Vector3D(
+                x=rotation_euler.x, y=rotation_euler.y, z=rotation_euler.z
+            ),
+            scale=Vector3D(x=obj.scale.x, y=obj.scale.y, z=obj.scale.z),
         )
         objects.append(blender_object)
 
@@ -106,56 +122,86 @@ async def render_scene():
     return rendered_scene
 
 
-@app.post("/add_cube")
+@app.post("/add_cube", response_model=OperationResult)
 async def add_cube():
     bpy.ops.mesh.primitive_cube_add()
-    return {"message": "Cube added"}
+    operation_result = OperationResult(
+        message="Cube added", scene_graph=get_scene_graph()
+    )
+    return {operation_result}
 
 
-@app.post("/add_sphere")
+@app.post("/add_sphere", response_model=OperationResult)
 async def add_sphere():
     bpy.ops.mesh.primitive_uv_sphere_add()
-    return {"message": "Sphere added"}
+    operation_result = OperationResult(
+        message="Sphere added", scene_graph=get_scene_graph()
+    )
+    return {operation_result}
 
 
-@app.post("/add_torus")
+@app.post("/add_torus", response_model=OperationResult)
 async def add_torus():
     bpy.ops.mesh.primitive_torus_add()
-    return {"message": "Torus added"}
+    operation_result = OperationResult(
+        message="Torus added", scene_graph=get_scene_graph()
+    )
+    return {operation_result}
 
 
-@app.post("/add_cylinder")
+@app.post("/add_cylinder", response_model=OperationResult)
 async def add_cylinder():
     bpy.ops.mesh.primitive_cylinder_add()
-    return {"message": "Cylinder added"}
+    operation_result = OperationResult(
+        message="Cylinder added", scene_graph=get_scene_graph()
+    )
 
 
-@app.post("/transform_object")
-async def transform_object(
-    name: str, location: list = None, rotation: list = None, scale: list = None
-):
+@app.post("/transform_object", response_model=OperationResult)
+async def transform_object(name: str, transform_input: TransformObjectInput):
     obj = bpy.data.objects.get(name)
     if not obj:
         return {"error": "Object not found"}
 
-    if location:
-        obj.location = location
-    if rotation:
-        obj.rotation_euler = rotation
-    if scale:
-        obj.scale = scale
+    if transform_input.location:
+        obj.location = (
+            transform_input.location.x,
+            transform_input.location.y,
+            transform_input.location.z,
+        )
+    if transform_input.rotation:
+        obj.rotation_euler = (
+            transform_input.rotation.x,
+            transform_input.rotation.y,
+            transform_input.rotation.z,
+        )
+    if transform_input.scale:
+        obj.scale = (
+            transform_input.scale.x,
+            transform_input.scale.y,
+            transform_input.scale.z,
+        )
 
-    return {"message": f"Object {name} transformed"}
+    operation_result = OperationResult(
+        message=f"Object {name} transformed", scene_graph=get_scene_graph()
+    )
+    return operation_result
 
 
-@app.post("/delete_object")
-async def delete_object(name: str):
+@app.post("/delete_object", response_model=OperationResult)
+async def delete_object(name: str) -> SceneGraph:
     obj = bpy.data.objects.get(name)
     if obj:
         bpy.data.objects.remove(obj)
-        return {"message": f"Object {name} deleted"}
+        operation_result = OperationResult(
+            message=f"Object {name} deleted", scene_graph=get_scene_graph()
+        )
+        return {operation_result}
     else:
-        return {"error": "Object not found"}
+        operation_result = OperationResult(
+            message=f"Object {name} not found", scene_graph=get_scene_graph()
+        )
+        return {operation_result}
 
 
 # Run the server
