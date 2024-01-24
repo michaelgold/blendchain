@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI()
+image_url = ""
 
 # Directory for rendered images
 rendered_images_dir = "rendered_images"
@@ -32,11 +33,15 @@ class BlenderObject(BaseModel):
 
 class SceneGraph(BaseModel):
     objects: List[BlenderObject]
+
+
+class RenderedScene(BaseModel):
     rendered_image_url: str
+    scene_graph: SceneGraph
 
 
 # Function to get the scene graph
-def get_scene_graph(rendered_image_url: str) -> SceneGraph:
+def get_scene_graph() -> SceneGraph:
     objects = []
     for obj in bpy.data.objects:
         # Convert the rotation to Euler angles if it's not already
@@ -56,11 +61,18 @@ def get_scene_graph(rendered_image_url: str) -> SceneGraph:
         )
         objects.append(blender_object)
 
-    return SceneGraph(objects=objects, rendered_image_url=rendered_image_url)
+    return SceneGraph(objects=objects)
 
 
-@app.post("/render_scene", response_model=SceneGraph)
+def get_rendered_scene(rendered_image_url: str) -> RenderedScene:
+    scene_graph = get_scene_graph()
+
+    return RenderedScene(rendered_image_url=rendered_image_url, scene_graph=scene_graph)
+
+
+@app.get("/scene_graph", response_model=SceneGraph)
 async def render_scene():
+    global image_url
     # Render settings and process
     filename = datetime.now().strftime("%Y%m%d_%H%M%S") + ".png"
     filepath = os.path.join(rendered_images_dir, filename)
@@ -71,9 +83,27 @@ async def render_scene():
     # URL to access the rendered image
     image_url = f"http://127.0.0.1:8000/static/{filename}"
 
-    # Get the scene graph
-    scene_graph = get_scene_graph(rendered_image_url=image_url)
-    return scene_graph
+    # Get the rendered scene
+    rendered_scene = get_rendered_scene(image_url)
+    return rendered_scene
+
+
+@app.post("/render_scene", response_model=RenderedScene)
+async def render_scene():
+    global image_url
+    # Render settings and process
+    filename = datetime.now().strftime("%Y%m%d_%H%M%S") + ".png"
+    filepath = os.path.join(rendered_images_dir, filename)
+    bpy.context.scene.render.filepath = filepath
+    bpy.context.scene.render.image_settings.file_format = "PNG"
+    bpy.ops.render.render(write_still=True)
+
+    # URL to access the rendered image
+    image_url = f"http://127.0.0.1:8000/static/{filename}"
+
+    # Get the rendered scene
+    rendered_scene = get_rendered_scene(image_url)
+    return rendered_scene
 
 
 @app.post("/add_cube")
