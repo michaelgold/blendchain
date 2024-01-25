@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import bpy
 import os
 from datetime import datetime
 from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+import math
 
 
 app = FastAPI()
@@ -29,12 +31,16 @@ class Vector3D(BaseModel):
     z: float
 
 
+class ObjectTransform(BaseModel):
+    location: Vector3D = None
+    rotation: Vector3D = None
+    scale: Vector3D = None
+
+
 class BlenderObject(BaseModel):
     name: str
     type: str
-    location: Vector3D
-    rotation: Vector3D
-    scale: Vector3D
+    object_transform: ObjectTransform
 
 
 class SceneGraph(BaseModel):
@@ -51,10 +57,12 @@ class RenderedScene(BaseModel):
     scene_graph: SceneGraph
 
 
-class TransformObjectInput(BaseModel):
-    location: Vector3D = None
-    rotation: Vector3D = None
-    scale: Vector3D = None
+# def deg2rad(deg):
+#     return deg * math.pi / 180
+
+
+# def rad2deg(rad):
+#     return rad * 180 / math.pi
 
 
 def get_scene_graph() -> SceneGraph:
@@ -66,14 +74,20 @@ def get_scene_graph() -> SceneGraph:
             else obj.rotation_quaternion.to_euler("XYZ")
         )
 
+        location = Vector3D(x=obj.location.x, y=obj.location.y, z=obj.location.z)
+        rotation = Vector3D(
+            x=math.degrees(rotation_euler.x),
+            y=math.degrees(rotation_euler.y),
+            z=math.degrees(rotation_euler.z),
+        )
+        scale = Vector3D(x=obj.scale.x, y=obj.scale.y, z=obj.scale.z)
+
         blender_object = BlenderObject(
             name=obj.name,
             type=obj.type,
-            location=Vector3D(x=obj.location.x, y=obj.location.y, z=obj.location.z),
-            rotation=Vector3D(
-                x=rotation_euler.x, y=rotation_euler.y, z=rotation_euler.z
+            object_transform=ObjectTransform(
+                location=location, rotation=rotation, scale=scale
             ),
-            scale=Vector3D(x=obj.scale.x, y=obj.scale.y, z=obj.scale.z),
         )
         objects.append(blender_object)
 
@@ -87,21 +101,11 @@ def get_rendered_scene(rendered_image_url: str) -> RenderedScene:
 
 
 @app.get("/scene_graph", response_model=SceneGraph)
-async def render_scene():
+async def scene_graph():
     global image_url
     # Render settings and process
-    filename = datetime.now().strftime("%Y%m%d_%H%M%S") + ".png"
-    filepath = os.path.join(rendered_images_dir, filename)
-    bpy.context.scene.render.filepath = filepath
-    bpy.context.scene.render.image_settings.file_format = "PNG"
-    bpy.ops.render.render(write_still=True)
 
-    # URL to access the rendered image
-    image_url = f"http://127.0.0.1:8000/static/{filename}"
-
-    # Get the rendered scene
-    rendered_scene = get_rendered_scene(image_url)
-    return rendered_scene
+    return get_scene_graph()
 
 
 @app.post("/render_scene", response_model=RenderedScene)
@@ -128,7 +132,7 @@ async def add_cube():
     operation_result = OperationResult(
         message="Cube added", scene_graph=get_scene_graph()
     )
-    return {operation_result}
+    return operation_result
 
 
 @app.post("/add_sphere", response_model=OperationResult)
@@ -137,7 +141,7 @@ async def add_sphere():
     operation_result = OperationResult(
         message="Sphere added", scene_graph=get_scene_graph()
     )
-    return {operation_result}
+    return operation_result
 
 
 @app.post("/add_torus", response_model=OperationResult)
@@ -146,7 +150,7 @@ async def add_torus():
     operation_result = OperationResult(
         message="Torus added", scene_graph=get_scene_graph()
     )
-    return {operation_result}
+    return operation_result
 
 
 @app.post("/add_cylinder", response_model=OperationResult)
@@ -157,11 +161,18 @@ async def add_cylinder():
     )
 
 
+def get_object(name: str):
+    obj = [obj for obj in bpy.data.objects if obj.name.lower() == name.lower()]
+    return obj[0] if obj else None
+
+
 @app.post("/transform_object", response_model=OperationResult)
-async def transform_object(name: str, transform_input: TransformObjectInput):
-    obj = bpy.data.objects.get(name)
+async def transform_object(name: str, transform_input: ObjectTransform):
+    obj = get_object(name)
     if not obj:
-        return {"error": "Object not found"}
+        return OperationResult(
+            message=f"Object {name} not found", scene_graph=get_scene_graph()
+        )
 
     if transform_input.location:
         obj.location = (
@@ -171,9 +182,9 @@ async def transform_object(name: str, transform_input: TransformObjectInput):
         )
     if transform_input.rotation:
         obj.rotation_euler = (
-            transform_input.rotation.x,
-            transform_input.rotation.y,
-            transform_input.rotation.z,
+            math.radians(transform_input.rotation.x),
+            math.radians(transform_input.rotation.y),
+            math.radians(transform_input.rotation.z),
         )
     if transform_input.scale:
         obj.scale = (
@@ -181,6 +192,14 @@ async def transform_object(name: str, transform_input: TransformObjectInput):
             transform_input.scale.y,
             transform_input.scale.z,
         )
+    obj.update_tag()  # Update the object to see the changes
+    bpy.context.view_layer.update()  # Update the scene
+
+    # save blendet file
+    download_path = Path(Path.home() / "Downloads")
+    filepath = str(download_path / "test.blend")
+    bpy.ops.wm.save_mainfile(filepath=filepath)
+    print(f"Saved file to {filepath}")
 
     operation_result = OperationResult(
         message=f"Object {name} transformed", scene_graph=get_scene_graph()
@@ -196,12 +215,12 @@ async def delete_object(name: str) -> SceneGraph:
         operation_result = OperationResult(
             message=f"Object {name} deleted", scene_graph=get_scene_graph()
         )
-        return {operation_result}
+        return operation_result
     else:
         operation_result = OperationResult(
             message=f"Object {name} not found", scene_graph=get_scene_graph()
         )
-        return {operation_result}
+        return operation_result
 
 
 # Run the server
