@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Tuple, Optional
 import bpy
@@ -6,11 +6,31 @@ import os
 from datetime import datetime
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+
 import math
 
 
 app = FastAPI()
 image_url = ""
+
+
+# @app.post("/api_interaction")
+# async def api_interaction(request: Request):
+#     global openapi_agent
+#     if not openapi_agent:
+#         ollama_model = OllamaModel(api_key='your_api_key')
+#         openapi_agent = create_openapi_agent(ollama_model, openapi_toolkit)
+#     body = await request.json()
+#     user_query = body.get("query")
+#     response = openapi_agent.run(user_query)
+#     return response
+
+# Create the OpenAPI agent
+
 
 # Directory for rendered images
 rendered_images_dir = "rendered_images"
@@ -38,9 +58,16 @@ class ObjectTransform(BaseModel):
 
 
 class BlenderObject(BaseModel):
+    id: str = None
     name: str
     type: str
     object_transform: ObjectTransform
+
+    # default id = name
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.id:
+            self.id = self.name
 
 
 class SceneGraph(BaseModel):
@@ -49,6 +76,7 @@ class SceneGraph(BaseModel):
 
 class OperationResult(BaseModel):
     message: str
+    active_object: BlenderObject = None
     scene_graph: SceneGraph
 
 
@@ -94,6 +122,9 @@ def get_scene_graph() -> SceneGraph:
     return SceneGraph(objects=objects)
 
 
+# def get_object(name: str):
+
+
 def get_rendered_scene(rendered_image_url: str) -> RenderedScene:
     scene_graph = get_scene_graph()
 
@@ -130,7 +161,9 @@ async def render_scene():
 async def add_cube():
     bpy.ops.mesh.primitive_cube_add()
     operation_result = OperationResult(
-        message="Cube added", scene_graph=get_scene_graph()
+        message="Cube added",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
     )
     return operation_result
 
@@ -139,16 +172,50 @@ async def add_cube():
 async def add_sphere():
     bpy.ops.mesh.primitive_uv_sphere_add()
     operation_result = OperationResult(
-        message="Sphere added", scene_graph=get_scene_graph()
+        message="Sphere added",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
     )
     return operation_result
+
+
+def get_blender_object(obj_name: str) -> BlenderObject:
+    scene_graph = get_scene_graph()
+    obj = [obj for obj in scene_graph.objects if obj.name.lower() == obj_name.lower()][
+        0
+    ]
+    blender_object = BlenderObject(
+        name=obj.name,
+        type=obj.type,
+        object_transform=ObjectTransform(
+            location=obj.object_transform.location,
+            rotation=obj.object_transform.rotation,
+            scale=obj.object_transform.scale,
+        ),
+    )
+    return blender_object
+
+
+def get_active_object() -> BlenderObject | None:
+    obj_name = bpy.context.view_layer.objects.active.name
+    if not obj_name:
+        return None
+    else:
+        return get_blender_object(obj_name)
 
 
 @app.post("/add_torus", response_model=OperationResult)
 async def add_torus():
     bpy.ops.mesh.primitive_torus_add()
+    logging.log(
+        logging.INFO,
+        f"Torus added\nActive object: {bpy.context.view_layer.objects.active.name}",
+    )
+
     operation_result = OperationResult(
-        message="Torus added", scene_graph=get_scene_graph()
+        message="Torus added",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
     )
     return operation_result
 
@@ -157,17 +224,21 @@ async def add_torus():
 async def add_cylinder():
     bpy.ops.mesh.primitive_cylinder_add()
     operation_result = OperationResult(
-        message="Cylinder added", scene_graph=get_scene_graph()
+        message="Cylinder added",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
     )
+    return operation_result
 
 
-def get_object(name: str):
+def get_object(name: str) -> bpy.types.Object | None:
     obj = [obj for obj in bpy.data.objects if obj.name.lower() == name.lower()]
     return obj[0] if obj else None
 
 
-@app.post("/transform_object", response_model=OperationResult)
-async def transform_object(name: str, transform_input: ObjectTransform):
+@app.post("/set_object_transformation", response_model=OperationResult)
+async def set_object_transformation(name: str, transform_input: ObjectTransform):
+    """Set object's location, rotation, and scale"""
     obj = get_object(name)
     if not obj:
         return OperationResult(
@@ -202,7 +273,105 @@ async def transform_object(name: str, transform_input: ObjectTransform):
     print(f"Saved file to {filepath}")
 
     operation_result = OperationResult(
-        message=f"Object {name} transformed", scene_graph=get_scene_graph()
+        message=f"Object {name} transformed",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
+    )
+    return operation_result
+
+
+@app.post("/rotate_object", response_model=OperationResult)
+async def rotate_object(name: str, rotation_input: Vector3D):
+    """Rotate object by x, y, z degrees"""
+    obj = get_object(name)
+    if not obj:
+        return OperationResult(
+            message=f"Object {name} not found", scene_graph=get_scene_graph()
+        )
+    blender_object = get_blender_object(name)
+
+    updated_x = blender_object.object_transform.rotation.x + rotation_input.x
+    updated_y = blender_object.object_transform.rotation.y + rotation_input.y
+    updated_z = blender_object.object_transform.rotation.z + rotation_input.z
+
+    if rotation_input:
+        obj.rotation_euler = (
+            math.radians(updated_x),
+            math.radians(updated_y),
+            math.radians(updated_z),
+        )
+
+    obj.update_tag()  # Update the object to see the changes
+    bpy.context.view_layer.update()  # Update the scene
+
+    operation_result = OperationResult(
+        message=f"Object {name} transformed",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
+    )
+    return operation_result
+
+
+@app.post("/move_object", response_model=OperationResult)
+async def move_object(name: str, location_input: Vector3D):
+    """Move object by x, y, z"""
+    obj = get_object(name)
+    if not obj:
+        return OperationResult(
+            message=f"Object {name} not found", scene_graph=get_scene_graph()
+        )
+    blender_object = get_blender_object(name)
+
+    updated_x = blender_object.object_transform.location.x + location_input.x
+    updated_y = blender_object.object_transform.location.y + location_input.y
+    updated_z = blender_object.object_transform.location.z + location_input.z
+
+    if location_input:
+        obj.location = (
+            updated_x,
+            updated_y,
+            updated_z,
+        )
+
+    obj.update_tag()  # Update the object to see the changes
+    bpy.context.view_layer.update()  # Update the scene
+
+    operation_result = OperationResult(
+        message=f"Object {name} transformed",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
+    )
+    return operation_result
+
+
+@app.post("/scale_object", response_model=OperationResult)
+async def scale_object(name: str, scale_input: Vector3D):
+    """Scale object by x, y, z"""
+    obj = get_object(name)
+    if not obj:
+        return OperationResult(
+            message=f"Object {name} not found", scene_graph=get_scene_graph()
+        )
+    blender_object = get_blender_object(name)
+
+    updated_x = blender_object.object_transform.scale.x * scale_input.x
+    updated_y = blender_object.object_transform.scale.y * scale_input.y
+    updated_z = blender_object.object_transform.scale.z * scale_input.z
+
+    if scale_input:
+        obj.scale = (
+            updated_x,
+            updated_y,
+            updated_z,
+        )
+
+    obj.update_tag()  # Update the object to see the changes
+    bpy.context.view_layer.update()  # Update the scene
+
+    operation_result = OperationResult(
+        message=f"Object {name} transformed",
+        active_object=get_active_object(),
+        scene_graph=get_scene_graph(),
     )
     return operation_result
 
