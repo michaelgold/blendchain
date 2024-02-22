@@ -12,6 +12,8 @@ from tenacity import RetryCallState
 
 logging.basicConfig(level=logging.INFO)
 
+model_name = "mistral:instruct"
+
 
 class CustomLLM(Ollama):
     def _generate(

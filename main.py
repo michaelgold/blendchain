@@ -133,6 +133,12 @@ def get_rendered_scene(rendered_image_url: str) -> RenderedScene:
 
 @app.get("/scene_graph", response_model=SceneGraph)
 async def scene_graph():
+    """
+    Retrieves the scene graph for the current image.
+
+    Returns:
+        SceneGraph: The scene graph object representing the current image.
+    """
     global image_url
     # Render settings and process
 
@@ -141,6 +147,12 @@ async def scene_graph():
 
 @app.post("/render_scene", response_model=RenderedScene)
 async def render_scene():
+    """
+    Renders the scene and returns the rendered scene.
+
+    Returns:
+        RenderedScene: The rendered scene object.
+    """
     global image_url
     # Render settings and process
     filename = datetime.now().strftime("%Y%m%d_%H%M%S") + ".png"
@@ -159,6 +171,12 @@ async def render_scene():
 
 @app.post("/add_cube", response_model=OperationResult)
 async def add_cube():
+    """
+    Adds a cube to the Blender scene.
+
+    Returns:
+        OperationResult: The result of the operation, including a message, the active object, and the scene graph.
+    """
     bpy.ops.mesh.primitive_cube_add()
     operation_result = OperationResult(
         message="Cube added",
@@ -170,6 +188,12 @@ async def add_cube():
 
 @app.post("/add_sphere", response_model=OperationResult)
 async def add_sphere():
+    """
+    Adds a UV sphere to the Blender scene.
+
+    Returns:
+        OperationResult: The result of the operation, including a message, the active object, and the scene graph.
+    """
     bpy.ops.mesh.primitive_uv_sphere_add()
     operation_result = OperationResult(
         message="Sphere added",
@@ -180,6 +204,18 @@ async def add_sphere():
 
 
 def get_blender_object(obj_name: str) -> BlenderObject:
+    """
+    Retrieves a BlenderObject from the scene graph based on the given object name.
+
+    Args:
+        obj_name (str): The name of the object to retrieve.
+
+    Returns:
+        BlenderObject: The BlenderObject with the specified name.
+
+    Raises:
+        IndexError: If no object with the specified name is found in the scene graph.
+    """
     scene_graph = get_scene_graph()
     obj = [obj for obj in scene_graph.objects if obj.name.lower() == obj_name.lower()][
         0
@@ -206,6 +242,12 @@ def get_active_object() -> BlenderObject | None:
 
 @app.post("/add_torus", response_model=OperationResult)
 async def add_torus():
+    """
+    Adds a torus to the Blender scene.
+
+    Returns:
+        OperationResult: The result of the operation, including a message, the active object, and the scene graph.
+    """
     bpy.ops.mesh.primitive_torus_add()
     logging.log(
         logging.INFO,
@@ -222,6 +264,12 @@ async def add_torus():
 
 @app.post("/add_cylinder", response_model=OperationResult)
 async def add_cylinder():
+    """
+    Adds a cylinder to the Blender scene.
+
+    Returns:
+        OperationResult: The result of the operation, including a message, the active object, and the scene graph.
+    """
     bpy.ops.mesh.primitive_cylinder_add()
     operation_result = OperationResult(
         message="Cylinder added",
@@ -238,7 +286,15 @@ def get_object(name: str) -> bpy.types.Object | None:
 
 @app.post("/set_object_transformation", response_model=OperationResult)
 async def set_object_transformation(name: str, transform_input: ObjectTransform):
-    """Set object's location, rotation, and scale"""
+    """Set object's location, rotation, and scale
+
+    Args:
+        name (str): The name of the object to transform.
+        transform_input (ObjectTransform): The transformation input containing the new location, rotation, and scale.
+
+    Returns:
+        OperationResult: The result of the operation, including a message, the active object, and the scene graph.
+    """
     obj = get_object(name)
     if not obj:
         return OperationResult(
@@ -282,7 +338,15 @@ async def set_object_transformation(name: str, transform_input: ObjectTransform)
 
 @app.post("/rotate_object", response_model=OperationResult)
 async def rotate_object(name: str, rotation_input: Vector3D):
-    """Rotate object by x, y, z degrees"""
+    """Rotate object by x, y, z degrees
+
+    Args:
+        name (str): The name of the object to rotate.
+        rotation_input (Vector3D): The rotation values for x, y, and z axes.
+
+    Returns:
+        OperationResult: The result of the rotation operation, including a message, the active object, and the scene graph.
+    """
     obj = get_object(name)
     if not obj:
         return OperationResult(
@@ -314,7 +378,15 @@ async def rotate_object(name: str, rotation_input: Vector3D):
 
 @app.post("/move_object", response_model=OperationResult)
 async def move_object(name: str, location_input: Vector3D):
-    """Move object by x, y, z"""
+    """Move object by x, y, z
+
+    Args:
+        name (str): The name of the object to be moved.
+        location_input (Vector3D): The amount to move the object in each axis (x, y, z).
+
+    Returns:
+        OperationResult: The result of the operation, including a message, the updated scene graph, and the active object.
+    """
     obj = get_object(name)
     if not obj:
         return OperationResult(
@@ -378,6 +450,15 @@ async def scale_object(name: str, scale_input: Vector3D):
 
 @app.post("/delete_object", response_model=OperationResult)
 async def delete_object(name: str) -> SceneGraph:
+    """
+    Deletes the object with the specified name from the scene.
+
+    Args:
+        name (str): The name of the object to delete.
+
+    Returns:
+        OperationResult: An OperationResult object containing the result of the operation and the updated scene graph.
+    """
     obj = bpy.data.objects.get(name)
     if obj:
         bpy.data.objects.remove(obj)

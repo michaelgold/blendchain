@@ -4,9 +4,9 @@ from langchain.requests import RequestsWrapper
 from langchain_core.language_models import BaseLanguageModel
 
 
-from langchain_community.agent_toolkits.openapi import planner
+# from langchain_community.agent_toolkits.openapi import planner
 
-# import custom_planner as planner
+import custom_planner as planner
 from langchain_community.agent_toolkits.openapi.spec import reduce_openapi_spec
 from typing import Any, Dict, List, Mapping, Optional
 
@@ -28,7 +28,7 @@ import ollama
 from fastapi import FastAPI
 from langchain import runnables  # Import Runnable from LangChain
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
-from custom_ollama import CustomLLM, RemoveBackslashesCallback
+from custom_ollama import CustomLLM, RemoveBackslashesCallback, model_name
 
 # from langchain_core.language_models.llms import ollama as Ollama
 from langchain_community.llms.ollama import Ollama
@@ -75,7 +75,10 @@ async def lifespan(app: FastAPI):
     reduced_openapi_spec = reduce_openapi_spec(openapi_spec)
 
     requests_wrapper = RequestsWrapper()
-    model_name = "mistral:instruct"
+
+    # model_name = "wizardcoder:7b-python"
+    # model_name = "deepseek-coder:6.7b"
+    # model_name = "llama2:13b-text"
 
     ensure_model_is_available(model_name)
     llm = CustomLLM(model=model_name, verbose=True)
@@ -96,7 +99,7 @@ async def lifespan(app: FastAPI):
         )
 
     # monkey patch the openapi agent planner to use our custom llm chain
-    planner._get_default_llm_chain = _get_default_llm_chain
+    # planner._get_default_llm_chain = _get_default_llm_chain
 
     openapi_agent: AgentExecutor = planner.create_openapi_agent(
         reduced_openapi_spec,
