@@ -10,3 +10,4 @@ requests==2.31.0
 zstandard==0.22.0
 ollama==0.1.4
 langchain==0.0.354
+uvicorn==0.22.0
