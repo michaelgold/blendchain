@@ -1,4 +1,5 @@
 """Agent that interacts with OpenAPI APIs via a hierarchical planning approach."""
+
 import json
 import re
 from functools import partial
@@ -11,7 +12,7 @@ from langchain_core.prompts import BasePromptTemplate, PromptTemplate
 from langchain_core.pydantic_v1 import Field
 from langchain_core.tools import BaseTool, Tool
 
-from langchain_community.agent_toolkits.openapi.planner_prompt import (
+from custom_planner_prompt import (
     API_CONTROLLER_PROMPT,
     API_CONTROLLER_TOOL_DESCRIPTION,
     API_CONTROLLER_TOOL_NAME,
