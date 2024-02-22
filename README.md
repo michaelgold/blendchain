@@ -46,10 +46,11 @@ To start the main BlendChain service on port 8000:
 uvicorn main:app --reload --port 8000
 ```
 
-main.py:
+`main.py:`
 Static Files Mounting
 /static: This endpoint serves static files from the rendered_images directory, allowing access to rendered images via a static URL.
-Pydantic Models
+
+### Pydantic Models
 Several Pydantic models are defined to structure the data for requests and responses:
 
 Vector3D: Represents a 3D vector with x, y, and z float components.
@@ -83,13 +84,16 @@ http://localhost:8001/docs for the LangChain server. This will open the Swagger 
 ### Using Swagger UI
 The Swagger UI provides a user-friendly web interface to interact with all the API endpoints defined in your FastAPI application. Here’s how to use it:
 
-Explore Endpoints: The `/docs` page lists all the available API endpoints, along with their HTTP methods (GET, POST, etc.), summaries, and descriptions. Click on any endpoint to expand its details.
+#### Explore Endpoints: 
+The `/docs` page lists all the available API endpoints, along with their HTTP methods (GET, POST, etc.), summaries, and descriptions. Click on any endpoint to expand its details.
 
-Try Out Requests: For each endpoint, you can click the "Try it out" button, which allows you to fill in any required parameters or request bodies. After inputting the necessary information, click "Execute" to make a live API call.
+#### Try Out Requests: 
+For each endpoint, you can click the "Try it out" button, which allows you to fill in any required parameters or request bodies. After inputting the necessary information, click "Execute" to make a live API call.
 
-View Responses: Once you've executed a request, the interface will display the actual request made, the server's response code, the response body, and headers. This is useful for debugging and understanding how your API behaves with different inputs.
+#### View Responses:
+Once you've executed a request, the interface will display the actual request made, the server's response code, the response body, and headers. This is useful for debugging and understanding how your API behaves with different inputs.
 
-Working with Specific Endpoints
+#### Working with Specific Endpoints:
 The BlendChain project's `/docs` will display endpoints like `/scene_graph`, `/render_scene`, and object manipulation endpoints (`/add_cube`, `/add_sphere`, etc.), allowing you to interact with the scene graph and render scenes through the API.
 
 The LangChain Server's `/docs` will offer endpoints related to API interaction schemas, config schemas, and invoking LangChain functionalities, providing a way to test and use LangChain's Runnable interfaces directly through the API.
