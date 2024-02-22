@@ -1,6 +1,6 @@
 
 Cython==3.0.8
-
+fastapi==0.109.0
 numpy==1.26.3
 
 pydantic==1.10.9
