@@ -3,14 +3,12 @@
 BlendChain leverages the power of ollama, langchain, FastAPI endpoints.
 
 
-## Features
-**Language Server:** A FastAPI-based language server offering a wide range of processing capabilities.
 
-**Custom Planning:** Tailor-made planning solutions to address specific use cases.
-
-**Extensibility:** Designed for easy integration and extension with other services or modules.
-
-## Installation
+Features
+Language Server: A FastAPI-based language server offering a wide range of processing capabilities.
+Custom Planning: Tailor-made planning solutions to address specific use cases.
+Extensibility: Designed for easy integration and extension with other services or modules.
+Installation
 Clone the repository and install the dependencies:
 
 ``` bash
@@ -20,18 +18,15 @@ pip install -r requirements.txt
 ```
 
 ## Dependencies
-**bpy:** For 3D modeling operations.
-
-**Cython, numpy:** For high-performance computing operations.
-
-**pydantic, requests:** For data validation and making HTTP requests.
-
-**zstandard:** For compression tasks.
-**ollama, langchain:** For advanced language processing.
+bpy: For 3D modeling operations.
+Cython, numpy: For high-performance computing operations.
+pydantic, requests: For data validation and making HTTP requests.
+zstandard: For compression tasks.
+ollama, langchain: For advanced language processing.
 Usage
 The project consists of multiple components, each designed to run as a separate service:
 
-## Starting the Language Server
+Starting the Language Server
 Run the following command to start the language server on port 8001:
 
 ```bash
