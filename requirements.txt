@@ -16,3 +16,4 @@ langchain-openai==0.0.6
 langserve==0.0.42
 langsmith==0.1.5
 uvicorn==0.22.0
+llama_index==0.9.46
