@@ -13,7 +13,7 @@ langchain==0.1.8
 langchain-community==0.0.21
 langchain-core==0.1.25
 langchain-openai==0.0.6
-langserve==0.0.42
+langserve==0.0.45
 langsmith==0.1.5
 uvicorn==0.22.0
 llama_index==0.9.46
