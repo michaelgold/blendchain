@@ -7,6 +7,8 @@ from datetime import datetime
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 
@@ -14,7 +16,18 @@ logging.basicConfig(level=logging.INFO)
 import math
 
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+
+    # unlink the default cube
+    bpy.data.objects.remove(bpy.data.objects["Cube"], do_unlink=True)
+    try:
+        yield
+    finally:
+        bpy.ops.wm.quit_blender()
+
+
+app = FastAPI(lifespan=lifespan)
 image_url = ""
 
 
@@ -40,7 +53,12 @@ os.makedirs(rendered_images_dir, exist_ok=True)
 rendered_images_dir = "rendered_images"
 os.makedirs(rendered_images_dir, exist_ok=True)
 
-# Mount the static directory to serve rendered images
+script_dir = Path.absolute(Path(__file__).parent)
+
+rendered_images_dir = script_dir / "rendered_images"
+
+
+# Mount the static directory to serve rendered images use the URL /static with pathlib.Path
 app.mount("/static", StaticFiles(directory=rendered_images_dir), name="static")
 
 
